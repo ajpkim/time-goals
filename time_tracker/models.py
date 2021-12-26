@@ -30,7 +30,7 @@ class TimeEntry:
 
     id = Column(Integer, primary_key=True)
     project_id = Column(ForeignKey("project.id"), nullable=False)
-    minutes = Column(Float)
+    minutes = Column(Integer)
     date = Column(String)
     created = Column(String, default=datetime.now)
 
@@ -46,15 +46,32 @@ class TimeGoal:
 
     id = Column(Integer, primary_key=True)
     project_id = Column(ForeignKey("project.id"), nullable=False)
-    minutes = Column(Float)
+    minutes = Column(Integer)
     start_date = Column(String)
     end_date = Column(String)
     created = Column(String, default=datetime.now)
 
     project = relationship("Project", back_populates="time_goals")
+    plan = relationship("Plan", back_populates="time_goals")
 
     def __repr__(self):
         return f"<TimeGoal(project #{self.project_id}: {self.minutes}m: {self.start_date} - {self.end_date})>"
+
+
+@mapper_registry.mapped
+class Plan:
+    __tablename__ = "plan"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    start_date = Column(String)
+    end_date = Column(String)
+    created = Column(String, default=datetime.now)
+
+    time_goals = relationship("TimeGoal", back_populates="plan")
+
+    def __repr__(self):
+        return f"<Plan({self.name}: {self.start_date} - {self.end_date})>"
 
 
 with engine.begin() as conn:
