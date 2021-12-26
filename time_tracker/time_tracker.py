@@ -3,13 +3,16 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, desc, func, select
 from sqlalchemy.orm import sessionmaker
 
-from models import Project, TimeEntry
+from models import Project, TimeEntry, TimeGoal
 
 
 engine = create_engine("sqlite:///test.db", echo=True, future=True)
 Session = sessionmaker(bind=engine, future=True)
 
 
+
+##################################################
+## Helpers
 def convert_hours_mins(minutes: float) -> (int, int):
     """Convert minutes into hours and minutes"""
     return int(minutes // 60), int(minutes % 60)
@@ -19,7 +22,8 @@ def get_time_str(minutes: float) -> str:
     hours, minutes = convert_hours_mins(minutes)
     return f"{hours}h {minutes}m" if hours else f"{minutes}m"
 
-
+##################################################
+## Create
 def create_project(name: str):
     with Session.begin() as session:
         project = Project(name=name)
@@ -27,7 +31,7 @@ def create_project(name: str):
         session.commit()
 
 
-def add_time_entry(project_name: str, minutes: float, date: str):
+def create_time_entry(project_name: str, minutes: float, date: str):
     with Session.begin() as session:
         stmt = select(Project).filter_by(name=project_name)
         project = session.execute(stmt).scalar()
@@ -36,6 +40,20 @@ def add_time_entry(project_name: str, minutes: float, date: str):
         session.commit()
 
 
+def create_time_goal(project_name: str, minutes: int, start_date: str, end_date: str):
+    with Session.begin() as session:
+        project_id = session.execute(
+            select(Project.id).filter_by(name=project_name)
+        ).scalar()
+        time_goal = TimeGoal(project_id=project_id,
+                             minutes=minutes,
+                             start_date=start_date,
+                             end_date=end_date)
+        session.add(time_goal)
+        session.commit()
+
+##################################################
+## Other stuff
 def get_recent_time_entries(n: int):
     with Session.begin() as session:
         stmt = select(TimeEntry).order_by(desc(TimeEntry.created)).limit(10)
@@ -71,6 +89,11 @@ def delete_time_entries(ids: [int]):
             session.delete(session.get(TimeEntry, x))
         session.commit()
 
+def get_timeframe_status(start_date, end_date ):
+    """
+    TODO: Gather all the info for the given time frame: projects, time entries, time goals
+    """
+    pass
 
 def view_project(project_name: str):
     with Session.begin() as session:
@@ -94,7 +117,12 @@ def view_project(project_name: str):
 
         print_project_report(project.name, timeframes.keys(), timeframes.values())
 
+"""
+This should be changed to "get_today_status()" which should gather all the
+info for the day: projects, time entries, and time goals
 
+This same pattern for arb date ranges
+"""
 def view_today():
     today = datetime.today().strftime("%Y-%m-%d")
     with Session.begin() as session:
@@ -110,7 +138,8 @@ def view_today():
 
         print_today_report(projects, minutes)
 
-
+##################################################
+## Printers
 def print_today_report(projects: [str], minutes: [float]):
     total_time = 0
     print("\n--- Today's Tracked Time ---")
