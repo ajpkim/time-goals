@@ -46,16 +46,17 @@ class TimeGoal:
 
     id = Column(Integer, primary_key=True)
     project_id = Column(ForeignKey("project.id"), nullable=False)
+    plan_id = Column(ForeignKey("plan.id"), nullable=False)
     minutes = Column(Integer)
-    start_date = Column(String)
-    end_date = Column(String)
+    # start_date = Column(String)
+    # end_date = Column(String)
     created = Column(String, default=datetime.now)
 
     project = relationship("Project", back_populates="time_goals")
     plan = relationship("Plan", back_populates="time_goals")
 
     def __repr__(self):
-        return f"<TimeGoal(project #{self.project_id}: {self.minutes}m: {self.start_date} - {self.end_date})>"
+        return f"<TimeGoal(plan: #{self.plan_id}: project #{self.project_id}: {self.minutes}m:)>"
 
 
 @mapper_registry.mapped
