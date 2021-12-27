@@ -48,8 +48,6 @@ class TimeGoal:
     project_id = Column(ForeignKey("project.id"), nullable=False)
     plan_id = Column(ForeignKey("plan.id"), nullable=False)
     minutes = Column(Integer)
-    # start_date = Column(String)
-    # end_date = Column(String)
     created = Column(String, default=datetime.now)
 
     project = relationship("Project", back_populates="time_goals")

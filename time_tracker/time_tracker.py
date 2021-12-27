@@ -19,16 +19,43 @@ def convert_hours_mins(minutes: float) -> (int, int):
 
 def get_time_str(minutes: float) -> str:
     hours, minutes = convert_hours_mins(minutes)
-    return f"{hours}h {minutes}m" if hours else f"{minutes}m"
+    if hours and minutes:
+        return f"{hours}h {minutes}m" if hours else f"{minutes}m"
+    elif hours:
+        return f"{hours}h"
+    elif minutes:
+        return f"{minutes}m"
+    else:
+        return ""
+
+
+def get_or_create(session, model, **kwargs):
+    """
+    TODO: Throw error if multiple instances meet criteria
+    """
+    instance = session.execute(select(model).filter_by(**kwargs)).scalar()
+    if instance:
+        return instance
+    else:
+        instance = model(**kwargs)
+        session.add(instance)
+        session.commit()
+        return instance
+
+
+def get_today_plan(session):
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    kwargs = {"name": today_str, "start_date": today_str, "end_date": today_str}
+    return get_or_create(session, Plan, **kwargs)
 
 
 ##################################################
 ## Get model object info
-def get_plan_id(name: str, session):
+def get_plan_id(session, name: str):
     return session.execute(select(Plan).filter_by(name=name)).scalar().id
 
 
-def get_project_id(name: str, session):
+def get_project_id(session, name: str):
     return session.execute(select(Project).filter_by(name=name)).scalar().id
 
 
@@ -48,14 +75,14 @@ def get_project_id(name: str, session):
 
 ##################################################
 ## Create
-def create_project(name: str, session):
+def create_project(session, name: str):
     project = Project(name=name)
     session.add(project)
     session.commit()
     return project
 
 
-def create_time_entry(project_name: str, minutes: float, date: str, session):
+def create_time_entry(session, project_name: str, minutes: float, date: str):
     stmt = select(Project).filter_by(name=project_name)
     project = session.execute(stmt).scalar()
     time_entry = TimeEntry(project_id=project.id, minutes=minutes, date=date)
@@ -64,16 +91,16 @@ def create_time_entry(project_name: str, minutes: float, date: str, session):
     return time_entry
 
 
-def create_time_goal(project_name: str, plan_name: str, minutes: int, session):
-    project_id = get_project_id(project_name, session)
-    plan_id = get_plan_id(plan_name, session)
+def create_time_goal(session, project_name: str, plan_name: str, minutes: int):
+    project_id = get_project_id(session, project_name)
+    plan_id = get_plan_id(session, plan_name)
     time_goal = TimeGoal(project_id=project_id, plan_id=plan_id, minutes=minutes)
     session.add(time_goal)
     session.commit()
     return time_goal
 
 
-def create_plan(name: str, start_date: str, end_date: str, session):
+def create_plan(session, name: str, start_date: str, end_date: str):
     plan = Plan(name=name, start_date=start_date, end_date=end_date)
     session.add(plan)
     session.commit()
@@ -82,21 +109,19 @@ def create_plan(name: str, start_date: str, end_date: str, session):
 
 ##################################################
 ## Get status
-def get_plan_status(plan_name: str, session) -> {str: (int, int)}:
+def get_plan_status(session, plan_name: str) -> {str: (int, int)}:
     plan = session.execute(select(Plan).filter_by(name=plan_name)).scalar()
     stmt = (
         select(Project.name, func.sum(TimeEntry.minutes), TimeGoal.minutes)
         .join(TimeEntry)
-        .where(
-            and_(TimeEntry.date >= plan.start_date, TimeEntry.date <= plan.end_date)
-        )
+        .where(and_(TimeEntry.date >= plan.start_date, TimeEntry.date <= plan.end_date))
         .group_by(Project.name)
         .join(TimeGoal)
     )
     return {proj: (mins, goal) for proj, mins, goal in session.execute(stmt)}
 
 
-def get_project_status(project_name: str, session) -> {str: int}:
+def get_project_status(session, project_name: str) -> {str: int}:
     project = session.execute(select(Project).filter_by(name=project_name)).scalar()
     today = datetime.today()
     timeframes = {
@@ -116,9 +141,7 @@ def get_project_status(project_name: str, session) -> {str: int}:
 
 
 def get_today_status(session) -> {str: [int]}:
-    """
-    Get plan agnostic today information.
-    """
+    """Get information about time tracked/alloated for today."""
     today = datetime.today().strftime("%Y-%m-%d")
     stmt = (
         select(Project.name, func.sum(TimeEntry.minutes))
@@ -128,21 +151,19 @@ def get_today_status(session) -> {str: [int]}:
         .order_by(desc(func.sum(TimeEntry.minutes)))
     )
     projects_minutes = session.execute(stmt)
-    projects_minutes_goals = {project: [minutes, 0] for (project, minutes) in projects_minutes}
-
-    try:
-        today_plan = session.execute(select(Plan).filter_by(name=today)).one()
-    except Exception as e:
-        today_plan = create_today_plan(session)
-
+    projects_minutes_goals = {proj: [mins, 0] for (proj, mins) in projects_minutes}
+    today_plan = get_today_plan(session)
     for goal in today_plan.time_goals:
-        project = session.execute(select(Project).filter_by(id=goal.project_id)).scalar()
+        project = session.execute(
+            select(Project).filter_by(id=goal.project_id)
+        ).scalar()
         if project.name in projects_minutes_goals:
             projects_minutes_goals[project.name][1] = goal.minutes
         else:
             projects_minutes_goals[project.name] = [0, goal.minutes]
 
     return projects_minutes_goals
+
 
 ##################################################
 ## Update Plan
@@ -161,7 +182,7 @@ def create_today_plan(session):
     return plan
 
 
-def create_week_plan(relative_start_date: int, session):
+def create_week_plan(session, relative_start_date: int):
     """
     TODO
     - Create a plan with ISO week # as name unless specified
@@ -172,39 +193,34 @@ def create_week_plan(relative_start_date: int, session):
     pass
 
 
-def allocate_time_today(project_name: str, minutes: int, session):
-    today_str = datetime.today().strftime("%Y-%m-%d")
+def allocate_time_today(session, project_name: str, minutes: int):
+    today_plan = get_today_plan(session)
+    project_id = get_project_id(session, project_name)
+    plan_project_ids = [x.project_id for x in today_plan.time_goals]
 
-
-    # create_plan(today_str, today_str, today_str)
-    # session.add(today_plan)
-    # session.commit()
-
-        # today_plan = session.execute(select(Plan).filter_by(name=today_str)).scalar()
-        # if not today_plan:
-        #     print('\n\n\n\nCREATING PLAN\n\n\n\n')
-        #     today_plan = create_today_plan()
-        ## Causes db issues "OperationalError"...
-    try:
-        today_plan = session.execute(select(Plan).filter_by(name=today_str)).one()
-    except Exception as e:
-        today_plan = create_today_plan(session)
-
-    time_goal = create_time_goal(project_name, today_plan.name, minutes, session)
-
-    # session.add(time_goal)
-    # session.commit()
+    if project_id in plan_project_ids:
+        time_goal = session.execute(
+            select(TimeGoal).where(
+                and_(
+                    TimeGoal.project_id == project_id, TimeGoal.plan_id == today_plan.id
+                )
+            )
+        ).scalar()
+        time_goal.minutes += minutes
+        session.commit()
+    else:
+        time_goal = create_time_goal(session, project_name, today_plan.name, minutes)
 
 
 def update_time_goal():
     pass
 
 
-def get_recent_time_entries(n: int, session):
+def get_recent_time_entries(session, n: int):
     stmt = select(TimeEntry).order_by(desc(TimeEntry.created)).limit(10)
     n_recent_time_entries = session.execute(stmt).scalars().all()
 
-        # interactive_update_recent_time_entries(n_recent_time_entries)
+    # interactive_update_recent_time_entries(n_recent_time_entries)
 
 
 def interactive_update_recent_time_entries(time_entries: [TimeEntry]):
@@ -228,11 +244,11 @@ def interactive_update_recent_time_entries(time_entries: [TimeEntry]):
     delete_time_entries(ids_to_delete)
 
 
-def delete_time_entries(ids: [int], session):
+def delete_time_entries(session, ids: [int]):
     for x in ids:
         session.delete(session.get(TimeEntry, x))
     session.commit()
 
 
-def add_time_goal_to_plan(plan_name, project_name, minutes, session):
+def add_time_goal_to_plan(session, plan_name, project_name, minutes):
     plan = get_plan(plan_name)

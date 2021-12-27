@@ -1,28 +1,33 @@
-from time_tracker import get_today_status
+from time_tracker import get_today_status, get_time_str
 
-def view_today_status():
-    today_str = datetime.today().strftime("%Y-%m-%d")
-    projects_minutes_goals = get_today_status()
-    report = ""
-
-
-
-
-def print_today_report(projects: [str], minutes: [int]):
+def generate_today_report(projects_minutes_goals: {str: [int]}) -> str:
     total_time = 0
-    print("\n--- Today's Tracked Time ---")
     report = ""
-    for project, mins in zip(projects, minutes):
+
+    for project, (mins, goal) in projects_minutes_goals.items():
         total_time += mins
-        time_str = get_time_str(mins)
-        report += f"{project:<25} {time_str}\n"
+        mins, goal = get_time_str(mins), get_time_str(goal)
+        report += f"{project:<25} {mins:<6} :: {goal}\n"
 
     total_time = get_time_str(total_time)
-    report += ".....\n" + "Total Time".ljust(25) + f"{total_time}\n"
+    report += ".....\n" + "Total Time".ljust(26) + f"{total_time}\n"
+    report = "\n---------- Today's Tracked Time ----------\n" + report
+    report += "------------------------------------------"
+    return report
+
+def generate_project_report():
+    pass
+
+
+def display_today_status(session):
+    data = get_today_status(session)
+    report = generate_today_report(data)
     print(report)
 
 
-def print_project_report(project_name: str, timeframes: [str], minutes: [int]):
+
+
+def display_project_report(project_name: str, timeframes: [str], minutes: [int]):
     print(f"\n---------- {project_name} ----------")
     report = ""
     for timeframe, mins in zip(timeframes, minutes):
