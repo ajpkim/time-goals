@@ -4,7 +4,7 @@ from sqlalchemy import and_, create_engine, desc, func, select
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import registry, relationship
 
-from helpers import today_str, week_str, week_endpoints
+from helpers import time_str, today_str, week_str, week_endpoints
 
 mapper_registry = registry()
 engine = create_engine("sqlite:///test.db", echo=True, future=True)
@@ -47,7 +47,7 @@ class Base:
 class Project(Base):
     __tablename__ = "project"
 
-    name = Column(String)
+    name = Column(String, nullable=False)
     created = Column(String, default=datetime.now)
     time_entries = relationship("TimeEntry", back_populates="project")
     time_goals = relationship("TimeGoal", back_populates="project")
@@ -77,6 +77,18 @@ class Project(Base):
 
         return status
 
+    def status_report(self, session):
+        status = self.status(session)
+        report = f"--- {self.name} Project Time ---\n"
+        for timeframe, minutes in list(status.items())[::-1]:
+            minutes = time_str(minutes)
+            report += f"{timeframe:<15} {minutes}\n"
+        report += "--------------------------"
+        return report
+
+    def display_status(self, session):
+        print(self.status_report(session))
+
     def __repr__(self):
         return f"<Project({self.name})>"
 
@@ -86,8 +98,8 @@ class TimeEntry(Base):
     __tablename__ = "time_entry"
 
     project_id = Column(ForeignKey("project.id"), nullable=False)
-    minutes = Column(Integer)
-    date = Column(String)
+    minutes = Column(Integer, nullable=False)
+    date = Column(String, nullable=False)
     created = Column(String, default=datetime.now)
     project = relationship("Project", back_populates="time_entries")
 
@@ -101,7 +113,7 @@ class TimeGoal(Base):
 
     project_id = Column(ForeignKey("project.id"), nullable=False)
     plan_id = Column(ForeignKey("plan.id"), nullable=False)
-    minutes = Column(Integer)
+    minutes = Column(Integer, nullable=False)
     created = Column(String, default=datetime.now)
     project = relationship("Project", back_populates="time_goals")
     plan = relationship("Plan", back_populates="time_goals")
@@ -122,8 +134,8 @@ class Plan(Base):
     __tablename__ = "plan"
 
     name = Column(String)
-    start_date = Column(String)
-    end_date = Column(String)
+    start_date = Column(String, nullable=False)
+    end_date = Column(String, nullable=False)
     created = Column(String, default=datetime.now)
     time_goals = relationship("TimeGoal", back_populates="plan")
 
@@ -142,7 +154,9 @@ class Plan(Base):
         return cls.get_or_create(session, **kwargs)
 
     def projects(self, session):
-        return [Project.get_from_id(session, goal.project_id) for goal in self.time_goals]
+        return [
+            Project.get_from_id(session, goal.project_id) for goal in self.time_goals
+        ]
 
     def add_time_goal(self, session, project_name: str, minutes: int):
         project_id = Project.get_id(session, project_name)
@@ -183,6 +197,29 @@ class Plan(Base):
                 status[project] = [0, goal.minutes]
 
         return status
+
+    def status_report(self, session):
+        status = self.status(session)
+        total_time = 0
+        total_time_goal = 0
+        report = f"\n---------- {self.name} Status ----------\n"
+
+        for project, (mins, goal) in status.items():
+            total_time += mins
+            total_time_goal += goal
+            mins, goal = time_str(mins), time_str(goal)
+            report += f"{project:<25} {mins:<6} :: {goal}\n"
+
+        total_time = time_str(total_time)
+        total_time_goal = time_str(total_time_goal)
+
+        report += ".....\n"
+        report += "Total Time".ljust(26) + f"{total_time:<6} :: {total_time_goal}\n"
+        report += "------------------------------------------"
+        return report
+
+    def display_status(self, session):
+        print(self.status_report(session))
 
     def __repr__(self):
         return f"<Plan({self.name}: {self.start_date} - {self.end_date})>"

@@ -22,7 +22,7 @@ def today_str():
     return datetime.today().strftime("%Y-%m-%d")
 
 
-def week_str(n):
+def week_str(n=0):
     date = datetime.today() + timedelta(weeks=n)
     return date.strftime("%Y-W%W")
 
