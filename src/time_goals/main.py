@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 from models import Plan, Project
 from helpers import today_str, week_str
-from time_tracker import log_time, add_time_to_today, add_time_to_week
+from time_goals import log_time, add_time_to_today, add_time_to_week
 
 def main():
     parser = argparse.ArgumentParser(prog="Time Tracker")
