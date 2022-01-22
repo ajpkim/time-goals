@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
-
+from sqlalchemy import select
 
 def convert_hours_mins(minutes: int) -> (int, int):
     """Convert minutes into hours and minutes"""
     return int(minutes // 60), int(minutes % 60)
-
 
 def time_str(minutes: int) -> str:
     hours, minutes = convert_hours_mins(minutes)
@@ -16,6 +15,10 @@ def time_str(minutes: int) -> str:
         return f"{minutes}m"
     else:
         return ""
+
+
+def date_str(date):
+    return date.strftime("%Y-%m-%d")
 
 
 def today_str():

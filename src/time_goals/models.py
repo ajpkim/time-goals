@@ -60,6 +60,59 @@ class Project(Base):
     def get_name(cls, session, id):
         return cls.get_from_id(session, id).name
 
+    @classmethod
+    def report(cls, session, names=[], start_date="1900", end_date=today_str()):
+        print(names, start_date, end_date)
+        if not names:
+            projects = session.execute(select(Project)).scalars().all()
+        else:
+            try:
+                projects = [
+                    Project.get_from_name(session, project).name for project in names
+                ]
+            except Exception as e:
+                print(e)
+        data = {proj.name: proj.get_time(session, start_date, end_date) for proj in projects}
+        return
+        return data
+
+    # @classmethod
+    # def display_report(cls, session, names, start_date, end_date):
+    #     # report = cls.report()
+
+    #     data = {proj.name: proj.get_time(session, start_date, end_date) for proj in projects}
+
+    #     # else:
+    #     #     try:
+
+    #     #         data = {proj.name: proj.get_time(session, start_date, end_date) for proj in
+    #     #         # data = {        #
+    #     #         data = {}
+    #     #         for project in names:
+    #     #             proj = Project.get_from_name(session, project)
+    #     #             data[project] = proj
+    #         # except Exception as e:
+    #         #     print(e)
+    #     return data
+
+    def get_time(self, session, start="1900-01-01", end=today_str()):
+        """
+        TODO
+        """
+        return sum(
+            session.execute(
+                select(TimeEntry.minutes).where(
+                    and_(
+                        TimeEntry.project_id == self.id,
+                        TimeEntry.date >= start,
+                        TimeEntry.date <= end,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
     def status(self, session) -> {str: int}:
         today = datetime.today()
         status = {
@@ -203,6 +256,7 @@ class Plan(Base):
         total_time = 0
         total_time_goal = 0
         report = f"\n---------- {self.name} Status ----------\n"
+        report += "Projects                   Time  :: Goal\n"
 
         for project, (mins, goal) in status.items():
             total_time += mins
