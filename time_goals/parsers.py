@@ -2,6 +2,14 @@ import argparse
 
 from helpers import today_str
 
+
+def add_category_name_pos_args(parser):
+    parser.add_argument(
+        "category", type=str, choices=["project", "plan"], help="Existing project"
+    )
+    parser.add_argument("name", type=str, help="Name")
+
+
 def add_project_mins_pos_args(parser):
     parser.add_argument("project", type=str, help="Existing project")
     parser.add_argument("minutes", type=int, help="Time in minutes")
@@ -54,6 +62,7 @@ def attach_view_subparser(subparser):
         help="Item to view time for, a Project or Plan. Defaults is today's plan.",
     )
 
+
 def attach_add_subparser(subparser):
     add_subparser = subparser.add_parser("add", help="Add time to a Plan.")
     add_project_mins_pos_args(add_subparser)
@@ -69,9 +78,13 @@ def attach_add_subparser(subparser):
 
 def attach_new_subparser(subparser):
     new_subparser = subparser.add_parser("new", help="Create new Projects and Plans")
+    add_category_name_pos_args(new_subparser)
+
 
 def get_parser():
-    parser = argparse.ArgumentParser(description="Tool for planning, tracking, and analyzing time.")
+    parser = argparse.ArgumentParser(
+        description="Tool for planning, tracking, and analyzing time."
+    )
     subparser = parser.add_subparsers(dest="command", metavar="")
     attach_log_subparser(subparser)
     attach_view_subparser(subparser)

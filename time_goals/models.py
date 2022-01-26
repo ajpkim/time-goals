@@ -72,7 +72,9 @@ class Project(Base):
                 ]
             except Exception as e:
                 print(e)
-        data = {proj.name: proj.get_time(session, start_date, end_date) for proj in projects}
+        data = {
+            proj.name: proj.get_time(session, start_date, end_date) for proj in projects
+        }
         return
         return data
 
@@ -256,7 +258,7 @@ class Plan(Base):
         total_time = 0
         total_time_goal = 0
         report = f"\n---------- {self.name} Status ----------\n"
-        report += "Projects                   Time  :: Goal\n"
+        report += "Projects                  Time   ::  Goal\n"
 
         for project, (mins, goal) in status.items():
             total_time += mins
