@@ -3,10 +3,9 @@ import argparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from time_goals import add_time, log, new, view
-
-from parsers import get_parser
 from models import Plan, Project
+from parsers import get_parser
+from time_goals import add_time, log, new, view
 
 
 def main(session, args):

@@ -209,9 +209,7 @@ class Plan(Base):
         return cls.get_or_create(session, **kwargs)
 
     def projects(self, session):
-        return [
-            Project.get_from_id(session, goal.project_id) for goal in self.time_goals
-        ]
+        return [Project.get_from_id(session, goal.project_id) for goal in self.time_goals]
 
     def add_time_goal(self, session, project_name: str, minutes: int):
         project_id = Project.get_id(session, project_name)

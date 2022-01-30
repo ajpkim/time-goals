@@ -1,6 +1,5 @@
-from models import TimeEntry, Plan, Project
-
 import helpers
+from models import Plan, Project, TimeEntry
 
 
 def add_time(session, project: str, mins: int, plan: str) -> None:
