@@ -1,4 +1,6 @@
+from typing import List
 from datetime import datetime, timedelta
+from collections import namedtuple
 
 from sqlalchemy import and_, create_engine, desc, func, select
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
@@ -60,46 +62,9 @@ class Project(Base):
     def get_name(cls, session, id):
         return cls.get_from_id(session, id).name
 
-    @classmethod
-    def report(cls, session, names=[], start_date="1900", end_date=today_str()):
-        print(names, start_date, end_date)
-        if not names:
-            projects = session.execute(select(Project)).scalars().all()
-        else:
-            try:
-                projects = [
-                    Project.get_from_name(session, project).name for project in names
-                ]
-            except Exception as e:
-                print(e)
-        data = {
-            proj.name: proj.get_time(session, start_date, end_date) for proj in projects
-        }
-        return
-        return data
-
-    # @classmethod
-    # def display_report(cls, session, names, start_date, end_date):
-    #     # report = cls.report()
-
-    #     data = {proj.name: proj.get_time(session, start_date, end_date) for proj in projects}
-
-    #     # else:
-    #     #     try:
-
-    #     #         data = {proj.name: proj.get_time(session, start_date, end_date) for proj in
-    #     #         # data = {        #
-    #     #         data = {}
-    #     #         for project in names:
-    #     #             proj = Project.get_from_name(session, project)
-    #     #             data[project] = proj
-    #         # except Exception as e:
-    #         #     print(e)
-    #     return data
-
     def get_time(self, session, start="1900-01-01", end=today_str()):
         """
-        TODO
+        Return the amount of time logged to this Project in between given dates.
         """
         return sum(
             session.execute(
@@ -115,34 +80,24 @@ class Project(Base):
             .all()
         )
 
-    def status(self, session) -> {str: int}:
+    def data(self, session):
+        """TODO"""
+        data = []
+        title = f"Time_Data_{self.name.replace(' ', '_').replace('-', '_')}"
+        Row = namedtuple(title, ["Timeframe", "Logged"])
         today = datetime.today()
-        status = {
+        timeframes = {
             "All Time": datetime(1, 1, 1),
             "Year": today.replace(month=1, day=1),
             "Month": today.replace(day=1),
             "Week": today - timedelta(days=today.weekday()),
             "Today": today,
         }
-        time_entries = self.time_entries
-        for timeframe, date in status.items():
-            date = date.strftime("%Y-%m-%d")
-            time_entries = [x for x in time_entries if x.date >= date]
-            status[timeframe] = sum([x.minutes for x in time_entries])
+        for timeframe, start in timeframes.items():
+            logged = self.get_time(session, start=start, end=today)
+            data.append(Row(timeframe, logged))
 
-        return status
-
-    def status_report(self, session):
-        status = self.status(session)
-        report = f"--- {self.name} Project Time ---\n"
-        for timeframe, minutes in list(status.items())[::-1]:
-            minutes = time_str(minutes)
-            report += f"{timeframe:<15} {minutes}\n"
-        report += "--------------------------"
-        return report
-
-    def display_status(self, session):
-        print(self.status_report(session))
+        return data
 
     def __repr__(self):
         return f"<Project({self.name})>"
@@ -196,12 +151,14 @@ class Plan(Base):
 
     @classmethod
     def today(cls, session):
+        """Convenience"""
         today = today_str()
         kwargs = {"name": today, "start_date": today, "end_date": today}
         return cls.get_or_create(session, **kwargs)
 
     @classmethod
     def week(cls, session, n=0):
+        """Convenience"""
         week = week_str(n)
         date = datetime.today() + timedelta(weeks=n)
         week_start, week_end = week_endpoints(date)
@@ -236,44 +193,17 @@ class Plan(Base):
         )
         return time_entries.scalars().all()
 
-    def status(self, session) -> {str: [int, int]}:
-        status = {}
-        for entry in self.time_entries(session):
-            project = Project.get_name(session, entry.project_id)
-            status[project] = [entry.minutes, 0]
-
+    def data(self, session) -> List[namedtuple]:
+        """TODO"""
+        data = []
+        title = f"Time_Data_{self.name.replace(' ', '_').replace('-', '_')}"
+        Row = namedtuple(title, ["Project", "Logged", "Goal"])
         for goal in self.time_goals:
-            project = Project.get_name(session, goal.project_id)
-            if project in status:
-                status[project][1] = goal.minutes
-            else:
-                status[project] = [0, goal.minutes]
+            project = Project.get_from_id(session, goal.project_id)
+            logged = project.get_time(session, start=self.start_date, end=self.end_date)
+            data.append(Row(project.name, logged, goal.minutes))
 
-        return status
-
-    def status_report(self, session):
-        status = self.status(session)
-        total_time = 0
-        total_time_goal = 0
-        report = f"\n---------- {self.name} Status ----------\n"
-        report += "Projects                  Time   ::  Goal\n"
-
-        for project, (mins, goal) in status.items():
-            total_time += mins
-            total_time_goal += goal
-            mins, goal = time_str(mins), time_str(goal)
-            report += f"{project:<25} {mins:<6} :: {goal}\n"
-
-        total_time = time_str(total_time)
-        total_time_goal = time_str(total_time_goal)
-
-        report += ".....\n"
-        report += "Total Time".ljust(26) + f"{total_time:<6} :: {total_time_goal}\n"
-        report += "------------------------------------------"
-        return report
-
-    def display_status(self, session):
-        print(self.status_report(session))
+        return data
 
     def __repr__(self):
         return f"<Plan({self.name}: {self.start_date} - {self.end_date})>"

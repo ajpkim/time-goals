@@ -12,7 +12,7 @@ def main(session, args):
     if args.command == "add":
         add_time(session, plan=args.plan)
     elif args.command == "log":
-        log(session, project=args.project, minutes=args.mins, date=args.date)
+        log(session, project=args.project, minutes=args.minutes, date=args.date)
     elif args.command == "new":
         new(session, category=args.category, name=args.name)
     elif args.command == "view":
@@ -25,4 +25,5 @@ if __name__ == "__main__":
     Session = sessionmaker(bind=engine, future=True)
     session = Session()
     args = get_parser().parse_args()
+    print("\n\n", args, "\n\n")
     main(session, args)
